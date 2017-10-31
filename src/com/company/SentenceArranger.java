@@ -12,34 +12,43 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.stream.Stream;
 
 public class SentenceArranger {
 
+    private static String searchBreked = AnsiColor.RED + " Поиск прерван " + AnsiColor.RESET;
+
     public static void main( String[] args ) throws IOException {
 
         // Считываем все английские слова с ретингами в мапу
         Map<String, Integer> map = readFileToMap();
         // Сортируем мапу( позволит заново итерироваться с места падения при ошибках )
-        Map<String, Integer> sortedMap = FileReader.sortByValue( map );
+        Map<String, Integer> sortedMap = sortByValue( map );
 
         // Для какждого слова бежим по всей википедии по одному файлу в иттерации
         // Если нашли более x предложений - останавливаемся
         //            иначе сколько нашли столько нашли =) если уже всю вики прочесали
 
-        // Записываем эти предложения в файл через [ word  @@@ Sentence rank ### Sentence example ] построчно
-        String fileForWrite = "C:\\Users\\panda.AUD208-ASKO\\Downloads\\demo\\WikipediaParser\\src\\com\\company\\output\\engSentence";
+        // Записываем эти предложения построчно в файл в виде [ слово  ^^^ ранк предложения  ###  пример предложения ]
+
+        // В папке /output должен появляться новый файлик каждые 1000 слов
+        String fileForWrite = "src\\com\\company\\output\\engSentence_";
+
         String newFileForWrite;
         String wikiFile;
         String sentence;
         String[] splittedSentence;
         Date date;
         int sentenceCounter;
-        int wordNum = 0;
+        int wordNum = -1;
         Map<String, Integer> sentencePull = new HashMap<>();
         Map<String, Integer> rankingSentencePull;
 
@@ -47,15 +56,12 @@ public class SentenceArranger {
         try {
             for( Map.Entry<String, Integer> engWord : sortedMap.entrySet() ) {
                 wordNum++;
-
                 if( wordNum % 10 == 1 ) {
                     newFileForWrite = fileForWrite + "_" + ( wordNum + 9 ) + ".txt";
                     bw = createNewFile( newFileForWrite );
                 }
-
-                if( wordNum >= 1 && null != bw ) { // для случая падения на каком-то слове
+                if( wordNum >= 0 && null != bw ) { // для случая падения на каком-то слове
                     date = new Date();
-
                     System.out.println( AnsiColor.BLUE +
                                         new Timestamp( date.getTime() ) +
                                         "\n Word №: " + wordNum + " " +
@@ -75,7 +81,6 @@ public class SentenceArranger {
                             for( String rs : sentenceArray ) {
                                 sentence = rs.trim();
                                 if( isRightSentence( sentence, engWord ) ) {
-
                                     splittedSentence = sentence
                                             .toLowerCase()
                                             .replaceAll( "[^a-zA-Z\\-']+", " " )
@@ -85,8 +90,8 @@ public class SentenceArranger {
                                         sentencePull.put( sentence, calcAvrRankOfSentence( sortedMap, splittedSentence ) );
                                     }
 
-                                    if( searchBreakerComplite( sentenceCounter, wordNum ) ) {
-                                        rankingSentencePull = FileReader.sortByValue( sentencePull );
+                                    if( searchBreakerComplete( sentenceCounter, wordNum ) ) {
+                                        rankingSentencePull = sortByValue( sentencePull );
                                         for( Map.Entry<String, Integer> entry : rankingSentencePull.entrySet() ) {
                                             bw.write( engWord.getKey() + "   ^^^   " + entry.getValue() + "   ###   " + entry.getKey() + ".\n" );
                                         }
@@ -108,19 +113,57 @@ public class SentenceArranger {
         }
     }
 
+
+    private static Map<String, Integer> readFileToMap() throws FileNotFoundException {
+        Map<String, Integer> map = new HashMap<>();
+        FileInputStream inputStream;
+        Scanner sc;
+        inputStream = new FileInputStream( "src\\com\\company\\resources\\sortedWordsWithRank" );
+        sc = new Scanner( inputStream, "UTF-8" );
+        int counter = 0;
+        while( sc.hasNextLine() ) {
+            String line = sc.nextLine();
+            String[] a = line.split( ":" );
+            map.put( a[ 0 ].trim(), Integer.parseInt( a[ 1 ].trim() ) );
+            counter++;
+        }
+        System.out.println( " Слова считаны. Всего " + counter );
+        return map;
+    }
+
+    private static <K, V extends Comparable<? super V>> Map<K, V>
+    sortByValue( Map<K, V> map ) {
+        List<Map.Entry<K, V>> list = new LinkedList<>( map.entrySet() );
+        list.sort( Comparator.comparing( o -> ( o.getValue() ) ) );
+
+        Map<K, V> result = new LinkedHashMap<>();
+        for( Map.Entry<K, V> entry : list ) {
+            result.put( entry.getKey(), entry.getValue() );
+        }
+        return result;
+    }
+
     private static boolean searchBreakerIfFew( int sentenceCounter, int i ) {
         if( i % 100 == 0 ) {
-            System.out.println( " Считали уже " + i + " файлов wiki: " + sentenceCounter + " предложений найдено" );
+            System.out.println( AnsiColor.YELLOW + " Считали уже " + i + " файлов wiki: " + sentenceCounter + " предложений найдено" + AnsiColor.RESET );
             if( i == 300 && sentenceCounter == 0 ) {
+                System.out.println( searchBreked );
                 return true;
             }
             if( i == 500 && sentenceCounter == 1 ) {
+                System.out.println( searchBreked );
                 return true;
             }
             if( i == 700 && sentenceCounter == 2 ) {
+                System.out.println( searchBreked );
                 return true;
             }
-            if( i > 1000 && sentenceCounter <= 3 ) {
+            if( i == 1000 && sentenceCounter <= 3 ) {
+                System.out.println( searchBreked );
+                return true;
+            }
+            if( i > 2000 && sentenceCounter <= 5 ) {
+                System.out.println( searchBreked );
                 return true;
             }
         }
@@ -150,7 +193,7 @@ public class SentenceArranger {
     }
 
 
-    private static boolean searchBreakerComplite( int sentenceCounter, int wordNum ) {
+    private static boolean searchBreakerComplete( int sentenceCounter, int wordNum ) {
         if( wordNum < 10001 ) {
             if( sentenceCounter == 50 ) {
                 searchedLog( sentenceCounter );
@@ -197,24 +240,9 @@ public class SentenceArranger {
                );
     }
 
-    private static Map<String, Integer> readFileToMap() throws FileNotFoundException {
-        Map<String, Integer> map = new HashMap<>();
-        FileInputStream inputStream;
-        Scanner sc;
-        inputStream = new FileInputStream( "C:\\Users\\panda.AUD208-ASKO\\Downloads\\demo\\WikipediaParser\\src\\com\\company\\resources\\sortedWordsWithRank" );
-        sc = new Scanner( inputStream, "UTF-8" );
-        int counter = 0;
-        while( sc.hasNextLine() ) {
-            String line = sc.nextLine();
-            String[] a = line.split( ":" );
-            map.put( a[ 0 ].trim(), Integer.parseInt( a[ 1 ].trim() ) );
-            counter++;
-        }
-        System.out.println( " Слова считаны. Всего " + counter );
-        return map;
-    }
 
-    private static String readLineByLineJava8( String... filePath ) {
+
+    private static String readLineByLine( String... filePath ) {
         StringBuilder contentBuilder = new StringBuilder();
         for( String f : filePath ) {
             try (Stream<String> stream = Files.lines( Paths.get( f ), StandardCharsets.UTF_8 )) {
@@ -230,21 +258,23 @@ public class SentenceArranger {
         return name.matches( "[A-Za-z .,!\"'/$]*" );
     }
 
+
+    // Наладить только этот метод -
     private static String iterateByWiki( Integer i ) {
         if( i >= 1 && i < 10 ) {
-            return readLineByLineJava8( "C:\\wiki\\20140615-wiki-en_00000" + i + ".txt\\20140615-wiki-en_00000" + i +
-                                        ".txt" );
+            return readLineByLine( "C:\\wiki\\20140615-wiki-en_00000" + i + ".txt\\20140615-wiki-en_00000" + i +
+                                   ".txt" );
         }
         if( i >= 10 && i < 100 ) {
-            return readLineByLineJava8( "C:\\wiki\\20140615-wiki-en_0000" + i + ".txt\\20140615-wiki-en_0000" + i + "" +
-                                        ".txt" );
+            return readLineByLine( "C:\\wiki\\20140615-wiki-en_0000" + i + ".txt\\20140615-wiki-en_0000" + i + "" +
+                                   ".txt" );
         }
         if( i >= 100 && i < 1000 ) {
-            return readLineByLineJava8( "C:\\wiki\\20140615-wiki-en_000" + i + ".txt\\20140615-wiki-en_000" + i + "" +
-                                        ".txt" );
+            return readLineByLine( "C:\\wiki\\20140615-wiki-en_000" + i + ".txt\\20140615-wiki-en_000" + i + "" +
+                                   ".txt" );
         }
         if( i >= 1000 && i < 4633 ) {
-            return readLineByLineJava8( "C:\\wiki\\20140615-wiki-en_00" + i + ".txt\\20140615-wiki-en_00" + i + ".txt" );
+            return readLineByLine( "C:\\wiki\\20140615-wiki-en_00" + i + ".txt\\20140615-wiki-en_00" + i + ".txt" );
         } else {
             return "";
         }
