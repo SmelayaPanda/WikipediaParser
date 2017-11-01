@@ -263,7 +263,7 @@ public class SentenceArranger {
             }
         }
         if( wordNum > 10000 && wordNum < 50000 ) {
-            if( sentenceCounter == 5 ) {
+            if( sentenceCounter == 10 ) {
                 searchedLog( sentenceCounter );
                 return true;
             }
